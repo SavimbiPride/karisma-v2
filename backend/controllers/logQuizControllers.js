@@ -8,7 +8,6 @@ exports.saveLogQuiz = async (req, res) => {
   }
 
   try {
-    // cari id_soal dari id_jawaban yg dikirim
     const [[row]] = await db.query(
       "SELECT id_soal FROM jawaban WHERE id = ?",
       [id_jawaban]
@@ -16,14 +15,12 @@ exports.saveLogQuiz = async (req, res) => {
     if (!row) return res.status(400).json({ message: "Jawaban tidak valid" });
     const id_soal = row.id_soal;
 
-    // hapus log sebelumnya utk soal yg sama (user yg sama)
     await db.query(`
       DELETE lq FROM log_quiz lq
       JOIN jawaban j2 ON lq.id_jawaban = j2.id
       WHERE lq.id_user = ? AND j2.id_soal = ?
     `, [id_user, id_soal]);
 
-    // simpan yang baru
     await db.query(
       "INSERT INTO log_quiz (id_user, id_jawaban, benar, salah) VALUES (?, ?, ?, ?)",
       [id_user, id_jawaban, benar, salah]
@@ -55,7 +52,7 @@ exports.getLogQuizByUserAndKelas = async (req, res) => {
       WHERE lq.id_user = ? AND ss.id_kelas = ?
     `, [id_user, id_kelas]);
 
-    res.json(rows); // array
+    res.json(rows); 
   } catch (err) {
     console.error("Gagal getLogQuizByUserAndKelas:", err);
     res.status(500).json({ message: "Gagal ambil data quiz user" });
