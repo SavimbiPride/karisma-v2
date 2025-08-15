@@ -16,10 +16,11 @@ export default function HalamanKelas() {
   const [userId, setUserId] = useState(null);
   const [submittedSessions, setSubmittedSessions] = useState([]);
   const [refreshTrigger, setRefreshTrigger] = useState(false);
-  const [quizTerjawab, setQuizTerjawab] = useState(null);
+  const [quizTerjawabPerSesi, setQuizTerjawabPerSesi] = useState({});
   const [nilai, setNilai] = useState(null);
   const [reviewMentor, setReviewMentor] = useState(null);
   const location = useLocation();
+  const quizTerjawab = quizTerjawabPerSesi[sesiAktif];
 
   const navigate = useNavigate();
 
@@ -29,11 +30,12 @@ export default function HalamanKelas() {
       const payload = JSON.parse(atob(token.split(".")[1]));
       setUserId(payload.id);
     }
-
     if (location.state?.fromKelas) {
       setRefreshTrigger((prev) => !prev);
     }
+  }, [location.state]);
 
+  useEffect(() => {
     const fetchAllData = async () => {
       try {
         const token = localStorage.getItem("token");
@@ -42,17 +44,24 @@ export default function HalamanKelas() {
         const res = await axios.get(`http://localhost:5000/api/kelas/${id}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-
         setKelas(res.data);
 
         if (!sesiAktif && res.data.sesi.length > 0) {
           setSesiAktif(res.data.sesi[0].id);
         }
+
         const quizRes = await axios.get(
           `http://localhost:5000/api/log_quiz/${payload.id}/${id}`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        setQuizTerjawab(quizRes.data);
+        const logObj = {};
+        (quizRes.data || []).forEach((item) => {
+          logObj[item.id_sesi] = {
+            id_jawaban: item.id_jawaban,
+            benar: !!item.benar,
+          };
+        });
+        setQuizTerjawabPerSesi(logObj);
 
         const nilaiRes = await axios.get(
           `http://localhost:5000/api/nilai/kursus/${payload.id}/${id}`,
@@ -67,18 +76,15 @@ export default function HalamanKelas() {
           setSubmittedSessions(sesiLulus);
 
           const totalSesi = res.data.sesi.length;
-          const progressBar = (sesiLulus.length / totalSesi) * 100;
-          setProgress(progressBar);
+          setProgress((sesiLulus.length / totalSesi) * 100);
         }
       } catch (err) {
         console.error("Gagal mengambil semua data:", err);
       }
     };
 
-    if (id) {
-      fetchAllData();
-    }
-  }, [id, location.state]);
+    if (id) fetchAllData();
+  }, [id, refreshTrigger]);
 
   useEffect(() => {
     const fetchNilaiDanReview = async () => {
@@ -112,6 +118,7 @@ export default function HalamanKelas() {
 
     fetchNilaiDanReview();
   }, [sesiAktif, userId]);
+
   const handleJawab = (id_sesi, jawaban, benar) => {
     setJawabanPerSesi((prev) => ({
       ...prev,
@@ -138,11 +145,6 @@ export default function HalamanKelas() {
       const token = localStorage.getItem("token");
       const payload = JSON.parse(atob(token.split(".")[1]));
 
-      if (!id_jawaban) {
-        console.error("id_jawaban undefined");
-        return;
-      }
-
       await axios.post(
         "http://localhost:5000/api/log_quiz",
         {
@@ -151,24 +153,26 @@ export default function HalamanKelas() {
           benar: benar ? 1 : 0,
           salah: benar ? 0 : 1,
         },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      setQuizTerjawab({ id_jawaban, benar });
+      setQuizTerjawabPerSesi((prev) => ({
+        ...prev,
+        [sesiAktif]: { id_jawaban, benar },
+      }));
 
       if (benar) {
-        toast.success("Jawaban Benar! YAAAAAAAAAAAAY");
+        toast.success("jawaban Benar! YAAAAAAAAAAAAY");
       } else {
         const benarJawaban = sesiSekarang.quiz[0]?.jawaban.find(
-          (j) => j.benar
+          (x) => x.benar
         )?.teks;
         setJawabanBenar(benarJawaban);
-        toast.error("Jawaban salah! Booooooo");
+        toast.error("jawaban salah! Booooooo");
       }
     } catch (err) {
       console.error("Gagal menyimpan jawaban:", err);
+      toast.error("Gagal menyimpan jawaban.");
     }
   };
 
@@ -186,7 +190,11 @@ export default function HalamanKelas() {
 
       setJawabanDipilih(null);
       setJawabanBenar(null);
-      setQuizTerjawab(null);
+      setQuizTerjawabPerSesi((prev) => {
+        const updated = { ...prev };
+        delete updated[sesiAktif];
+        return updated;
+      });
     } catch (err) {
       console.error("Gagal menghapus log quiz:", err);
       toast.error("Gagal coba lagi.");
@@ -289,7 +297,7 @@ export default function HalamanKelas() {
                     return (
                       <button
                         key={idx}
-                        disabled={!!quizTerjawab} // ❗ user tidak bisa klik ulang jika sudah menjawab
+                        disabled={!!quizTerjawab}
                         onClick={() => {
                           if (!quizTerjawab) {
                             handleJawabanClick(j.teks, j.benar, j.id);

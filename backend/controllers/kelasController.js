@@ -39,13 +39,11 @@ exports.tambahKelas = async (req, res) => {
   }
 
   try {
-    // Validasi user dulu
     const [cekUser] = await db.query('SELECT id FROM users WHERE id = ? AND role = ?', [id_users, 'mentor']);
     if (cekUser.length === 0) {
       return res.status(400).json({ message: 'User tidak ditemukan atau bukan mentor.' });
     }
 
-    // Insert ke kelas
     const [kelasResult] = await db.query(
       `INSERT INTO kelas (id_users, judul, deskripsi, harga, image)
       VALUES (?, ?, ?, ?, ?)`,
@@ -54,7 +52,6 @@ exports.tambahKelas = async (req, res) => {
 
     const kelasId = kelasResult.insertId;
 
-    // Simpan tools
     const toolIds = JSON.parse(selectedToolIds);
     for (let toolId of toolIds) {
       await db.query(
@@ -75,14 +72,12 @@ exports.getKelasById = async (req, res) => {
   const { id } = req.params;
 
   try {
-    // Ambil data kelas
     const [kelasRows] = await db.query(`SELECT * FROM kelas WHERE id = ?`, [id]);
     if (kelasRows.length === 0) {
       return res.status(404).json({ message: 'Kelas tidak ditemukan' });
     }
     const kelas = kelasRows[0];
 
-    // Ambil data mentor berdasarkan id_users dari kelas
     const [mentorRows] = await db.query(
       `SELECT username, foto, tentang FROM users WHERE id = ? AND role = 'mentor'`,
       [kelas.id_users]
@@ -93,7 +88,6 @@ exports.getKelasById = async (req, res) => {
       ? `http://localhost:5000/uploads/${mentor.foto}`
       : null;
 
-    // Ambil tools yang terhubung dengan kelas
     const [tools] = await db.query(`
       SELECT t.*, CONCAT('http://localhost:5000/uploads/', t.image) AS image_url
       FROM kelas_tools kt
@@ -101,17 +95,14 @@ exports.getKelasById = async (req, res) => {
       WHERE kt.id_kelas = ?
     `, [id]);
 
-    // Ambil sesi berdasarkan id_kelas
     const [sesiRows] = await db.query(`SELECT * FROM sesi WHERE id_kelas = ?`, [id]);
 
     const sesi = await Promise.all(sesiRows.map(async (sesiItem) => {
-      // Ambil tugas untuk sesi ini
       const [tugasRows] = await db.query(
         `SELECT soal_tugas FROM tugas WHERE id_sesi = ?`,
         [sesiItem.id]
       );
 
-      // Ambil soal quiz untuk sesi ini
       const [quizSoalRows] = await db.query(`
         SELECT q.id_soal, soal.soal 
         FROM quiz q 
@@ -119,7 +110,6 @@ exports.getKelasById = async (req, res) => {
         WHERE q.id_sesi = ?
       `, [sesiItem.id]);
 
-      // Ambil jawaban untuk setiap soal
       const quiz = await Promise.all(quizSoalRows.map(async (q) => {
         const [jawabanRows] = await db.query(`
           SELECT id, jawaban, benar 
@@ -144,7 +134,6 @@ exports.getKelasById = async (req, res) => {
       };
     }));
 
-    // Kirim response
     res.json({
       ...kelas,
       username: mentor.username || 'Tidak diketahui',
@@ -166,7 +155,6 @@ exports.getEditKelas = async (req, res) => {
   const kelasId = req.params.id;
 
   try {
-    // Ambil data kelas dan mentor berdasarkan relasi id_users
     const [kelasRows] = await db.query(`
       SELECT 
         k.id, k.judul, k.deskripsi, k.harga, 
@@ -183,7 +171,6 @@ exports.getEditKelas = async (req, res) => {
 
     const kelas = kelasRows[0];
 
-    // Ambil tools yang berelasi dengan kelas
     const [tools] = await db.query(`
       SELECT t.id, t.judul, t.deskripsi, t.image
       FROM kelas_tools kt
@@ -191,7 +178,6 @@ exports.getEditKelas = async (req, res) => {
       WHERE kt.id_kelas = ?
     `, [kelasId]);
 
-    // Tambahkan informasi tools dan mentor ke dalam objek kelas
     kelas.tools = tools;
     kelas.foto_pengajar_url = kelas.mentor_foto ? `http://localhost:5000/uploads/${kelas.mentor_foto}` : null;
     kelas.tentang_pengajar = kelas.mentor_tentang || '';
@@ -205,29 +191,26 @@ exports.getEditKelas = async (req, res) => {
 
 // update
 exports.updateKelas = async (req, res) => {
-    const { id } = req.params; // id kelas
-    const { judul, deskripsi, harga, id_users, selectedToolIds } = req.body; // Menerima array ID tools yang dipilih
+    const { id } = req.params; 
+    const { judul, deskripsi, harga, id_users, selectedToolIds } = req.body; 
 
     let toolsToAssociate = [];
     try {
-        // Asumsikan selectedToolIds adalah string JSON dari frontend
         toolsToAssociate = typeof selectedToolIds === 'string' ? JSON.parse(selectedToolIds) : (selectedToolIds || []);
 
-        // Pastikan semua elemen adalah angka dan unik
         toolsToAssociate = [...new Set(toolsToAssociate.map(Number).filter(id => !isNaN(id)))];
     } catch (err) {
-        console.error('❌ Gagal parse selectedToolIds:', err);
+        console.error('Gagal parse selectedToolIds:', err);
         return res.status(400).json({ message: 'Format ID tools tidak valid' });
     }
 
     const imageFile = req.files?.gambar_kelas?.[0]?.filename;
     const oldImage = req.body.old_image || null;
 
-    const connection = await db.getConnection(); // Dapatkan koneksi untuk transaksi
+    const connection = await db.getConnection();
     try {
-        await connection.beginTransaction(); // Mulai transaksi
+        await connection.beginTransaction(); 
 
-        // 1. 🔧 Update data kelas (judul, deskripsi, harga, image, id_users)
         const updateFields = [judul, deskripsi, harga];
         let sqlKelas = `UPDATE kelas SET judul = ?, deskripsi = ?, harga = ?`;
 
@@ -241,53 +224,46 @@ exports.updateKelas = async (req, res) => {
 
         const [resultKelas] = await connection.query(sqlKelas, updateFields);
         if (resultKelas.affectedRows === 0) {
-            await connection.rollback(); // Rollback jika kelas tidak ditemukan
+            await connection.rollback(); 
             return res.status(404).json({ message: 'Kelas tidak ditemukan' });
         }
 
-        // 2. 🔄 Sinkronisasi asosiasi tools di tabel kelas_tools
-
-        // 2a. Ambil ID tools yang sudah terkait dengan kelas ini
         const [existingTools] = await connection.query(
-            `SELECT id_tools FROM kelas_tools WHERE id_kelas = ?`, // Menggunakan 'kelas_tools'
+            `SELECT id_tools FROM kelas_tools WHERE id_kelas = ?`, 
             [id]
         );
         const existingToolIds = new Set(existingTools.map(row => row.id_tools));
 
-        // 2b. Identifikasi tools yang perlu ditambahkan (ada di toolsToAssociate, tidak ada di existingToolIds)
         const toolsToAdd = toolsToAssociate.filter(toolId => !existingToolIds.has(toolId));
 
-        // 2c. Identifikasi tools yang perlu dihapus (ada di existingToolIds, tidak ada di toolsToAssociate)
         const toolsToRemove = Array.from(existingToolIds).filter(toolId => !toolsToAssociate.includes(toolId));
 
-        // 2d. Lakukan penghapusan
         if (toolsToRemove.length > 0) {
             const placeholders = toolsToRemove.map(() => '?').join(',');
             await connection.query(
-                `DELETE FROM kelas_tools WHERE id_kelas = ? AND id_tools IN (${placeholders})`, // Menggunakan 'kelas_tools'
+                `DELETE FROM kelas_tools WHERE id_kelas = ? AND id_tools IN (${placeholders})`, 
                 [id, ...toolsToRemove]
             );
-            console.log(`🗑️ Tools dihapus dari kelas ${id}:`, toolsToRemove);
+            console.log(`tools dihapus dari kelas ${id}:`, toolsToRemove);
         }
 
-        // 2e. Lakukan penambahan
         if (toolsToAdd.length > 0) {
             const values = toolsToAdd.map(toolId => `(${id}, ${toolId})`).join(', ');
             await connection.query(
-                `INSERT INTO kelas_tools (id_kelas, id_tools) VALUES ${values}` // Menggunakan 'kelas_tools'
+                `INSERT INTO kelas_tools (id_kelas, id_tools) VALUES ${values}`
             );
-            console.log(`✅ Tools ditambahkan ke kelas ${id}:`, toolsToAdd);
+            console.log(`tools ditambahkan ke kelas ${id}:`, toolsToAdd);
         }
 
-        await connection.commit(); // Komit transaksi jika semua berhasil
+        await connection.commit();
         res.status(200).json({ message: 'Kelas berhasil diperbarui' });
 
     } catch (err) {
-        await connection.rollback(); // Rollback jika ada kesalahan
-        console.error('❌ Gagal update kelas:', err);
+        await connection.rollback(); 
+        console.error('gagal update kelas:', err);
         res.status(500).json({ message: 'Terjadi kesalahan server' });
     } finally {
-        if (connection) connection.release(); // Pastikan koneksi dikembalikan ke pool
+        if (connection) connection.release(); 
     }
 };
 

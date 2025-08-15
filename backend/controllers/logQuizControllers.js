@@ -3,21 +3,36 @@ const db = require('../db');
 // save save, kalau gak di save nanti nangis ulang lagi dari cj di lempar ama polisi korup
 exports.saveLogQuiz = async (req, res) => {
   const { id_user, id_jawaban, benar, salah } = req.body;
-
-  if (!id_jawaban) {
-    return res.status(400).json({ message: 'id_jawaban tidak boleh kosong' });
+  if (!id_user || !id_jawaban) {
+    return res.status(400).json({ message: "id_user & id_jawaban wajib" });
   }
 
   try {
+    // cari id_soal dari id_jawaban yg dikirim
+    const [[row]] = await db.query(
+      "SELECT id_soal FROM jawaban WHERE id = ?",
+      [id_jawaban]
+    );
+    if (!row) return res.status(400).json({ message: "Jawaban tidak valid" });
+    const id_soal = row.id_soal;
+
+    // hapus log sebelumnya utk soal yg sama (user yg sama)
+    await db.query(`
+      DELETE lq FROM log_quiz lq
+      JOIN jawaban j2 ON lq.id_jawaban = j2.id
+      WHERE lq.id_user = ? AND j2.id_soal = ?
+    `, [id_user, id_soal]);
+
+    // simpan yang baru
     await db.query(
       "INSERT INTO log_quiz (id_user, id_jawaban, benar, salah) VALUES (?, ?, ?, ?)",
       [id_user, id_jawaban, benar, salah]
     );
 
-    res.json({ message: 'Berhasil simpan log quiz' });
+    res.json({ message: "Berhasil simpan log quiz" });
   } catch (err) {
     console.error("Error saveLogQuiz:", err);
-    res.status(500).json({ message: 'Gagal simpan log quiz' });
+    res.status(500).json({ message: "Gagal simpan log quiz" });
   }
 };
 
@@ -26,25 +41,24 @@ exports.getLogQuizByUserAndKelas = async (req, res) => {
   const { id_user, id_kelas } = req.params;
 
   try {
-    const [result] = await db.query(`
-      SELECT lq.id_jawaban, lq.benar
+    const [rows] = await db.query(`
+      SELECT 
+        ss.id     AS id_sesi,
+        s.id      AS id_soal,
+        lq.id_jawaban,
+        lq.benar
       FROM log_quiz lq
       JOIN jawaban j ON lq.id_jawaban = j.id
-      JOIN soal s ON j.id_soal = s.id
-      JOIN quiz q ON s.id = q.id_soal
-      JOIN sesi ss ON q.id_sesi = ss.id
+      JOIN soal s    ON j.id_soal = s.id
+      JOIN quiz q    ON s.id = q.id_soal
+      JOIN sesi ss   ON q.id_sesi = ss.id
       WHERE lq.id_user = ? AND ss.id_kelas = ?
-      LIMIT 1
     `, [id_user, id_kelas]);
 
-    if (result.length === 0) {
-      return res.json(null);
-    }
-
-    res.json(result[0]);
+    res.json(rows); // array
   } catch (err) {
-    console.error('Gagal getLogQuizByUserAndKelas:', err);
-    res.status(500).json({ message: 'Gagal ambil data quiz user' });
+    console.error("Gagal getLogQuizByUserAndKelas:", err);
+    res.status(500).json({ message: "Gagal ambil data quiz user" });
   }
 };
 
