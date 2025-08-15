@@ -125,7 +125,7 @@ const LandingPage = () => {
           <div className="flex items-center space-x-4 mt-8">
             <button
               onClick={prevKelas}
-              className="p-2 bg-yellow-400 rounded-full hover:bg-yellow-500"
+              className="p-2 bg-yellow-400 rounded-full hover:bg-yellow-500 cursor-pointer"
             >
               <FiChevronLeft size={24} />
             </button>
@@ -145,7 +145,7 @@ const LandingPage = () => {
 
             <button
               onClick={nextKelas}
-              className="p-2 bg-yellow-400 rounded-full hover:bg-yellow-500"
+              className="p-2 bg-yellow-400 rounded-full hover:bg-yellow-500 cursor-pointer"
             >
               <FiChevronRight size={24} />
             </button>

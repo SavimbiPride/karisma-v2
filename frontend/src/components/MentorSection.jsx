@@ -60,7 +60,7 @@ export default function MentorSection() {
           <button
             onClick={prevMentor}
             disabled={mentorIndex === 0}
-            className={`p-2 rounded-full bg-yellow-400 hover:bg-yellow-500 disabled:opacity-50`}
+            className={`p-2 rounded-full bg-yellow-400 hover:bg-yellow-500 disabled:opacity-50 cursor-pointer`}
           >
             <FiChevronLeft size={24} />
           </button>
@@ -88,7 +88,7 @@ export default function MentorSection() {
           <button
             onClick={nextMentor}
             disabled={mentorIndex >= mentors.length - 3}
-            className={`p-2 rounded-full bg-yellow-400 hover:bg-yellow-500 disabled:opacity-50`}
+            className={`p-2 rounded-full bg-yellow-400 hover:bg-yellow-500 disabled:opacity-50 cursor-pointer`}
           >
             <FiChevronRight size={24} />
           </button>

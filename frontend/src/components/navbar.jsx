@@ -112,7 +112,7 @@ export default function Navbar() {
               <div className="relative">
                 <button
                   onClick={() => setMenuOpen(!menuOpen)}
-                  className="flex items-center gap-2 bg-blue-950 rounded-2xl p-1.5 pl-2 pr-3 text-white"
+                  className="flex items-center gap-2 bg-blue-950 rounded-2xl p-1.5 pl-2 pr-3 text-white cursor-pointer"
                 >
                   <img
                     src={`http://localhost:5000/uploads/${foto}?t=${Date.now()}`}
